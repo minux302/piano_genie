@@ -29,6 +29,7 @@ class NoteSeqLoader():
         end_times = np.array([note.end_time for note in note_sequence_ordered])
         if note_sequence_ordered:
             # Delta time start hight to indicate free decision
+            # time between note on and next note on.
             delta_times = np.concatenate([[100000.],
                                          start_times[1:] - start_times[:-1]])
         else:
@@ -60,7 +61,7 @@ class NoteSeqLoader():
 
         # Filter sequences that are too short
         dataset = dataset.filter(lambda x: self._filter_short(x))
-        # Get random crops
+        # Get random seq_len crops from songs
         dataset = dataset.map(lambda x: self._random_crop(x))
 
         if self.repeat:
@@ -100,11 +101,11 @@ if __name__ == '__main__':
             while True:
                 try:
                     batch = sess.run(dataset.get_batch())
-                    # print(batch['midi_pitches'])
-                    print(batch['midi_pitches'].shape)
-                    # print(batch['delta_times'])
-                    # print(batch['start_times'])
-                    # print(batch['end_times'])
+                    # print(batch['midi_pitches'].shape)
+                    print(batch['midi_pitches'])
+                    print(batch['delta_times'])
+                    print(batch['start_times'])
+                    print(batch['end_times'])
                 except tf.errors.OutOfRangeError:
                     break
 
