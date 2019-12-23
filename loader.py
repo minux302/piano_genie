@@ -28,8 +28,8 @@ class NoteSeqLoader():
         start_times = np.array([note.start_time for note in note_sequence_ordered])
         end_times = np.array([note.end_time for note in note_sequence_ordered])
         if note_sequence_ordered:
+            # Delta time is a time between note on and next note on.
             # Delta time start hight to indicate free decision
-            # time between note on and next note on.
             delta_times = np.concatenate([[100000.],
                                          start_times[1:] - start_times[:-1]])
         else:
@@ -80,13 +80,6 @@ class NoteSeqLoader():
         note_start_times = note_sequence_tensors[:, :, 2]
         note_end_times = note_sequence_tensors[:, :, 3]
 
-        # batch_data = {
-        #     "midi_pitches": note_pitches,
-        #     "delta_times": note_delta_times,
-        #     "start_times": note_start_times,
-        #     "end_times": note_end_times
-        # }
-        # return batch_data
         return (note_pitches,
                 note_delta_times,
                 note_start_times,
@@ -104,15 +97,8 @@ if __name__ == '__main__':
             sess.run(dataset.initializer())
             while True:
                 try:
-                    batch = sess.run(dataset.get_batch())
-                    print(batch['midi_pitches'].shape)
-                    print(batch['delta_times'].shape)
-                    print(batch['start_times'].shape)
-                    print(batch['end_times'].shape)
-                    # print(batch['midi_pitches'])
-                    # print(batch['delta_times'])
-                    # print(batch['start_times'])
-                    # print(batch['end_times'])
+                    batch_data = sess.run(dataset.get_batch())
+                    print(batch_data[0])
                 except tf.errors.OutOfRangeError:
                     break
 

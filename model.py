@@ -96,6 +96,7 @@ class PianoGenirModel():
               inputs):
         out_dict = {}
 
+        # Todo
         note_pitches = inputs[0]
         note_delta_times = inputs[1]
         note_start_times = inputs[2]
@@ -108,12 +109,7 @@ class PianoGenirModel():
         # Create sequence lens
         seq_lens = tf.ones([self.batch_size], dtype=tf.int32) * self.seq_len
 
-        enc_feats = []
-        enc_feats.append(tf.one_hot(pitches, 88))
-        enc_feats = tf.concat(enc_feats, axis=2)  # shape:
-
-        return enc_feats
-
+        enc_feats = tf.one_hot(pitches, 88)  # (batch_size, seq_len, 88)
         """
         with tf.variable_scope("encoder"):
             enc_stp, enc_seq = simple_lstm_encoder(
