@@ -1,7 +1,6 @@
 import tensorflow as tf
 import numpy as np
 
-import config
 from loader import NoteSeqLoader
 from model import PianoGenirModel
 from config import Config
@@ -10,13 +9,12 @@ from config import Config
 def train():
 
     config = Config()
-    dataset = NoteSeqLoader(file_name=self.file_name,
+    dataset = NoteSeqLoader(file_name=config.file_name,
                             batch_size=config.batch_size,
                             seq_len=config.seq_len,
                             repeat=False)
 
-    model = PianoGenirModel(batch_size=config.batch_size,
-                            seq_len=config.seq_len,
+    model = PianoGenirModel(config=config,
                             is_training=True)
     input_pls = model.placeholders()
     outputs = model.build(input_pls)

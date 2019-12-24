@@ -83,7 +83,7 @@ class PianoGenirModel():
                 cell_fw=cell,
                 cell_bw=cell,
                 inputs=x,
-                sequence_length=self.seq_lens,
+                sequence_length=self.seq_len,
                 dtype=tf.float32)
             x = tf.concat([x_fw, x_bw], axis=2)
         return x
@@ -104,7 +104,8 @@ class PianoGenirModel():
 
         enc_feats = tf.one_hot(pitches, 88)  # (batch_size, seq_len, 88)
         with tf.variable_scope("encoder"):
-            enc_stp = simple_lstm_encoder(enc_feats)
+            enc_stp = self._lstm_encoder(enc_feats)
+        return enc_stp
 
         """
         # Integer-quantized step embeddings with straight-through
