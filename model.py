@@ -4,30 +4,6 @@ import tensorflow.compat.v1 as tf
 from tensorflow.contrib import rnn as contrib_rnn
 
 
-def simple_lstm_encoder(features,
-                        seq_lens,
-                        rnn_nlayers=2,
-                        rnn_nunits=128):
-    x = features
-
-    with tf.variable_scope("rnn_input"):
-        x = tf.layers.dense(x, rnn_nunits)
-
-    celltype = contrib_rnn.LSTMBlockCell
-    cell = contrib_rnn.MultiRNNCell(
-        [celltype(rnn_units) for _ in range(rnn_nlayers)])
-    # Todo use Bidirectional LSTM
-    with tf.variable_scope("rnn"):
-        x, state = tf.nn.dynamic_rnn(
-            cell=cell,
-            inputs=x,
-            sequence_length=seq_lens,
-            dtype=tf.float32)
-        state = state[-1].h
-
-    return x, state
-
-
 def simple_lstm_decoder(features,
                         seq_lens,
                         batch_size,
@@ -65,15 +41,15 @@ def weighted_avg(t, mask=None, axis=None, expand_mask=False):
 
 class PianoGenirModel():
     def __init__(self,
-                 # cfg,
-                 batch_size,
-                 seq_len,
-                 is_training,
-                 ):
-        # self.cfg = cfg
-        self.batch_size = batch_size
-        self.seq_len = seq_len
+                 config,
+                 is_training):
+        self.config = config
+        self.batch_size = config.batch_size
+        self.seq_len = config.seq_len
         self.is_training = is_training
+
+        self.rnn_nunits = config.rnn_nunits
+        self.rnn_nlayers = config.rnn_nlayers
 
     def placeholders(self):
         note_pitches = tf.placeholder(tf.int32,
@@ -93,8 +69,26 @@ class PianoGenirModel():
                 note_start_times,
                 note_end_times)
 
-    def build(self,
-              inputs):
+    def _lstm_encoder(self, inputs):
+        # Todo Imprelement by tf.keras.layers
+        with tf.variable_scope("rnn_input"):
+            x = tf.layers.dense(inputs, self.rnn_nunits)
+
+        cell = contrib_rnn.MultiRNNCell(
+            [contrib_rnn.LSTMBlockCell(self.rnn_nunits)
+             for _ in range(self.rnn_nlayers)])
+
+        with tf.variable_scope("rnn"):
+            (x_fw, x_bw), (state_fw, state_bw) = tf.nn.bidirectional_dynamic_rnn(
+                cell_fw=cell,
+                cell_bw=cell,
+                inputs=x,
+                sequence_length=self.seq_lens,
+                dtype=tf.float32)
+            x = tf.concat([x_fw, x_bw], axis=2)
+        return x
+
+    def build(self, inputs):
         out_dict = {}
         note_pitches = inputs[0]
         note_delta_times = inputs[1]
@@ -109,17 +103,10 @@ class PianoGenirModel():
         seq_lens = tf.ones([self.batch_size], dtype=tf.int32) * self.seq_len  # shape (1)
 
         enc_feats = tf.one_hot(pitches, 88)  # (batch_size, seq_len, 88)
-        return enc_feats
-        """
         with tf.variable_scope("encoder"):
-            enc_stp, enc_seq = simple_lstm_encoder(
-                enc_feats,
-                seq_lens,
-                rnn_nlayers=cfg.rnn_nlayers,
-                rnn_nunits=cfg.rnn_nunits)
+            enc_stp = simple_lstm_encoder(enc_feats)
 
-        latents = []
-
+        """
         # Integer-quantized step embeddings with straight-through
         with tf.variable_scope("stp_emb_iq"):
             with tf.variable_scope("pre_iq"):
