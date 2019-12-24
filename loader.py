@@ -1,4 +1,4 @@
-import random
+import sys
 
 import numpy as np
 import tensorflow.compat.v1 as tf
@@ -27,8 +27,8 @@ class NoteSeqLoader():
         pitches = np.array([note.pitch for note in note_sequence_ordered])
         start_times = np.array([note.start_time for note in note_sequence_ordered])
         end_times = np.array([note.end_time for note in note_sequence_ordered])
+        # Delta time is a time between note on and next note on.
         if note_sequence_ordered:
-            # Delta time is a time between note on and next note on.
             # Delta time start hight to indicate free decision
             delta_times = np.concatenate([[100000.],
                                          start_times[1:] - start_times[:-1]])
@@ -39,11 +39,11 @@ class NoteSeqLoader():
                         axis=1).astype(np.float32)
 
     def _filter_short(self, note_sequence_tensor):
-        note_sequence_len = tf.shape(note_sequence_tensor)[0]
+        note_sequence_len = tf.shape(note_sequence_tensor)[0]  # shape: (song_len, 4)
         return tf.greater_equal(note_sequence_len, self.seq_len)
 
     def _random_crop(self, note_sequence_tensor):
-        note_sequence_len = tf.shape(note_sequence_tensor)[0]
+        note_sequence_len = tf.shape(note_sequence_tensor)[0]  # shape: (song_len, 4)
         start_max = note_sequence_len - self.seq_len
         start_max = tf.maximum(start_max, 0)
         start = tf.random_uniform([], maxval=start_max + 1, dtype=tf.int32)
@@ -54,15 +54,15 @@ class NoteSeqLoader():
         dataset = tf.data.TFRecordDataset(file_name)
         dataset = dataset.map(
             lambda data: tf.py_func(
-                lambda x: self._str_to_tensor(x),
+                self._str_to_tensor,
                 [data],
-                tf.float32,
+                [tf.float32],
                 stateful=False))
 
         # Filter sequences that are too short
-        dataset = dataset.filter(lambda x: self._filter_short(x))
+        dataset = dataset.filter(self._filter_short)
         # Get random seq_len crops from songs
-        dataset = dataset.map(lambda x: self._random_crop(x))
+        dataset = dataset.map(self._random_crop)
 
         if self.repeat:
             dataset = dataset.shuffle(buffer_size=512)
@@ -97,8 +97,8 @@ if __name__ == '__main__':
             sess.run(dataset.initializer())
             while True:
                 try:
-                    batch_data = sess.run(dataset.get_batch())
-                    print(batch_data[0])
+                    batch_input = sess.run(dataset.get_batch())
+                    print(batch_input[0])
                 except tf.errors.OutOfRangeError:
                     break
 
