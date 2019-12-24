@@ -1,4 +1,3 @@
-import sys
 import util
 import tensorflow.compat.v1 as tf
 from tensorflow.contrib import rnn as contrib_rnn
@@ -70,22 +69,12 @@ class PianoGenirModel():
                 note_end_times)
 
     def _lstm_encoder(self, inputs):
-        # Todo Imprelement by tf.keras.layers
         with tf.variable_scope("rnn_input"):
             x = tf.layers.dense(inputs, self.rnn_nunits)
 
-        cell = contrib_rnn.MultiRNNCell(
-            [contrib_rnn.LSTMBlockCell(self.rnn_nunits)
-             for _ in range(self.rnn_nlayers)])
-
-        with tf.variable_scope("rnn"):
-            (x_fw, x_bw), (state_fw, state_bw) = tf.nn.bidirectional_dynamic_rnn(
-                cell_fw=cell,
-                cell_bw=cell,
-                inputs=x,
-                sequence_length=self.seq_len,
-                dtype=tf.float32)
-            x = tf.concat([x_fw, x_bw], axis=2)
+        x = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(self.rnn_nunits,
+                                                               return_sequences=True))(x)
+        x = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(self.rnn_nunits))(x)
         return x
 
     def build(self, inputs):
@@ -97,12 +86,11 @@ class PianoGenirModel():
 
         # Paese features
         pitches = util.demidity(note_pitches)  # [0, 88)
-        pitches_scalar = ((tf.cast(pitches, tf.float32) / 87.) * 2.) - 1.  # [-1, 1)
 
         # Create sequence lens
         seq_lens = tf.ones([self.batch_size], dtype=tf.int32) * self.seq_len  # shape (1)
 
-        enc_feats = tf.one_hot(pitches, 88)  # (batch_size, seq_len, 88)
+        enc_feats = tf.one_hot(pitches, 88, axis=-1)  # (batch_size, seq_len, 88)
         with tf.variable_scope("encoder"):
             enc_stp = self._lstm_encoder(enc_feats)
         return enc_stp

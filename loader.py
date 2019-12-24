@@ -98,10 +98,11 @@ if __name__ == '__main__':
             while True:
                 try:
                     batch_data = sess.run(dataset.get_batch())
-                    print(batch_data[0].shape)
-                    print(batch_data[1].shape)
-                    print(batch_data[2].shape)
-                    print(batch_data[3].shape)
+                    # print(batch_data[0].shape)
+                    # print(batch_data[1].shape)
+                    # print(batch_data[2].shape)
+                    # print(batch_data[3].shape)
+                    print(batch_data[0])
                 except tf.errors.OutOfRangeError:
                     break
 

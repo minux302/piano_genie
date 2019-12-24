@@ -20,6 +20,9 @@ def train():
     outputs = model.build(input_pls)
 
     with tf.Session() as sess:
+        init_op = tf.global_variables_initializer()
+        sess.run([init_op])
+
         for epoch in range(1):
             sess.run(dataset.initializer())
             while True:
