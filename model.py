@@ -1,3 +1,4 @@
+import sys
 import util
 import tensorflow.compat.v1 as tf
 from tensorflow.contrib import rnn as contrib_rnn
@@ -95,8 +96,6 @@ class PianoGenirModel():
     def build(self,
               inputs):
         out_dict = {}
-
-        # Todo
         note_pitches = inputs[0]
         note_delta_times = inputs[1]
         note_start_times = inputs[2]
@@ -107,9 +106,10 @@ class PianoGenirModel():
         pitches_scalar = ((tf.cast(pitches, tf.float32) / 87.) * 2.) - 1.  # [-1, 1)
 
         # Create sequence lens
-        seq_lens = tf.ones([self.batch_size], dtype=tf.int32) * self.seq_len
+        seq_lens = tf.ones([self.batch_size], dtype=tf.int32) * self.seq_len  # shape (1)
 
         enc_feats = tf.one_hot(pitches, 88)  # (batch_size, seq_len, 88)
+        return enc_feats
         """
         with tf.variable_scope("encoder"):
             enc_stp, enc_seq = simple_lstm_encoder(

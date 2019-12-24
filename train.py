@@ -1,33 +1,36 @@
 import tensorflow as tf
 import numpy as np
 
-import util
+import config
 from loader import NoteSeqLoader
 from model import PianoGenirModel
+from config import Config
 
 
 def train():
-    dataset = NoteSeqLoader(file_name='midi_sample_tf',
-                            batch_size=2,
-                            seq_len=5,
+
+    config = Config()
+    dataset = NoteSeqLoader(file_name=self.file_name,
+                            batch_size=config.batch_size,
+                            seq_len=config.seq_len,
                             repeat=False)
 
-    model = PianoGenirModel(batch_size=1,
-                            seq_len=5,
+    model = PianoGenirModel(batch_size=config.batch_size,
+                            seq_len=config.seq_len,
                             is_training=True)
-    inputs = model.placeholders()
-    outputs = model.build(inputs)
+    input_pls = model.placeholders()
+    outputs = model.build(input_pls)
 
     with tf.Session() as sess:
         for epoch in range(1):
             sess.run(dataset.initializer())
             while True:
                 try:
-                    batch_data = sess.run(dataset.get_batch())
+                    batch_datas = sess.run(dataset.get_batch())
                     out = sess.run(outputs,
-                                   feed_dict={pl: data
-                                              for pl, data
-                                              in zip(inputs, batch_data)})
+                                   feed_dict={input_pl: batch_data
+                                              for input_pl, batch_data
+                                              in zip(input_pls, batch_datas)})
                     print(np.array(out).shape)
                     # print(out)
                 except tf.errors.OutOfRangeError:
