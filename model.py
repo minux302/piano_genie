@@ -68,13 +68,13 @@ class PianoGenirModel():
                 note_start_times,
                 note_end_times)
 
+    # Todo, rethink for this module
     def _lstm_encoder(self, inputs):
-        with tf.variable_scope("rnn_input"):
-            x = tf.layers.dense(inputs, self.rnn_nunits)
-
+        x = tf.layers.dense(inputs, self.rnn_nunits)
         x = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(self.rnn_nunits,
                                                                return_sequences=True))(x)
-        x = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(self.rnn_nunits))(x)
+        x = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(self.rnn_nunits,
+                                                               return_sequences=True))(x)
         return x
 
     def build(self, inputs):
@@ -92,15 +92,13 @@ class PianoGenirModel():
 
         enc_feats = tf.one_hot(pitches, 88, axis=-1)  # (batch_size, seq_len, 88)
         with tf.variable_scope("encoder"):
-            enc_stp = self._lstm_encoder(enc_feats)
-        return enc_stp
+            enc_stp = self._lstm_encoder(enc_feats)  # (batch_size, seq_len, rnn_nunits * 2)
 
-        """
         # Integer-quantized step embeddings with straight-through
         with tf.variable_scope("stp_emb_iq"):
+            # Todo what is pre_iq_encoding ?
             with tf.variable_scope("pre_iq"):
-                # pre_iq_encoding is tf.float32 of [batch_size, seq_len]
-                pre_iq_encoding = tf.layers.dense(enc_stp, 1)[:, :, 0]
+                pre_iq_encoding = tf.layers.dense(enc_stp, 1)[:, :, 0]  # (batch_size, seq_len)
 
             def iqst(x, n):
                 eps = 1e-7
