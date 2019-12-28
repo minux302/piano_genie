@@ -1,4 +1,3 @@
-import util
 import tensorflow.compat.v1 as tf
 
 
@@ -34,7 +33,7 @@ class PianoGenieModel():
             x = tf.keras.layers.Bidirectional(
                     tf.keras.layers.LSTM(self.rnn_nunits,
                                          return_sequences=True))(x)  # (batch_size, seq_len, self.rnn_nunits * 2)
-            x = tf.layers.dense(x, 1)[:, :, 0]  # (batch_size, seq_len, 1)
+            x = tf.layers.dense(x, 1)[:, :, 0]
         return x
 
     def _lstm_decoder(self, x):
@@ -62,9 +61,8 @@ class PianoGenieModel():
         input_pitches = input_dict["pitches"]
         # input_delta_times_int = input_dict["delta_times_int"]
 
-        # pitches = util.demidity(input_pitches)
         enc_inputs = tf.one_hot(input_pitches, 88, axis=-1)  # (batch_size, seq_len, 88)
-        enc_outputs = self._lstm_encoder(enc_inputs)  # (batch_size, seq_len)
+        enc_outputs = self._lstm_encoder(enc_inputs)  # (batch_size, seq_len, 1)
         quantized_enc_outputs = self._iqae(enc_outputs)  # (batch_size, seq_len, 1)
 
         # Regularize to encourage encoder to output in range
@@ -86,6 +84,8 @@ class PianoGenieModel():
         output_dict["iqae_contour_penalty"] = iqae_contour_penalty
 
         dec_outputs = self._lstm_decoder(quantized_enc_outputs)
+
+        # Roconstruction loss
         dec_recons_loss = tf.reduce_mean(
             tf.nn.sparse_softmax_cross_entropy_with_logits(
                 logits=dec_outputs,
@@ -95,4 +95,3 @@ class PianoGenieModel():
         output_dict["dec_recons_loss"] = dec_recons_loss
 
         return output_dict
-        

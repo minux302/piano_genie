@@ -27,7 +27,7 @@ def train():
                                    feed_dict={input_dict[key]: batch_datas[key]
                                               for key in input_dict.keys()})
                     # print(np.array(out).shape)
-                    print(out)
+                    print(out["dec_outputs"].shape)
                 except tf.errors.OutOfRangeError:
                     break
 
