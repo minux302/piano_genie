@@ -99,7 +99,6 @@ class PianoGenieModel():
                 "reconstructions_loss": reconstruction_loss}
 
     def loss(self, output_dict):
-        combined_loss = output_dict["reconstruction_loss"] + \
+        return output_dict["reconstruction_loss"] + \
             self.config.range_loss_ratio * output_dict["range_loss"] + \
             self.config.coutour_loss_ratio * output_dict["contour_loss"]
-        return combined_loss
