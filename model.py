@@ -56,6 +56,24 @@ class PianoGenieModel():
             forward_quantized_x = x + tf.stop_gradient(quantized_x - x)
         return tf.expand_dims(forward_quantized_x, axis=2)
 
+    def _range_loss(self, enc_outputs):
+        return tf.reduce_mean(
+            tf.square(tf.maximum(tf.abs(enc_outputs) - 1, 0)))
+
+    def _contour_loss(self, enc_outputs, input_pitches):
+        delta_enc_outputs = enc_outputs[:, 1:] - enc_outputs[:, :-1]
+        delta_pitches = tf.cast(input_pitches[:, 1:] - input_pitches[:, :-1],
+                                tf.float32)
+        return tf.reduce_mean(tf.square(
+            tf.maximum(1.0 - tf.multiply(delta_enc_outputs, delta_pitches),
+                       0)))
+
+    def _reconstruction_loss(self, dec_outputs, input_pitches):
+        return tf.reduce_mean(
+            tf.nn.sparse_softmax_cross_entropy_with_logits(
+                logits=dec_outputs,
+                labels=input_pitches))
+
     def build(self, input_dict):
         output_dict = {}
         input_pitches = input_dict["pitches"]
@@ -64,34 +82,15 @@ class PianoGenieModel():
         enc_inputs = tf.one_hot(input_pitches, 88, axis=-1)  # (batch_size, seq_len, 88)
         enc_outputs = self._lstm_encoder(enc_inputs)  # (batch_size, seq_len, 1)
         quantized_enc_outputs = self._iqae(enc_outputs)  # (batch_size, seq_len, 1)
-
-        # Regularize to encourage encoder to output in range
-        iqae_range_penalty = tf.reduce_mean(
-            tf.square(tf.maximum(tf.abs(enc_outputs) - 1, 0)))
-        output_dict["iqae_range_penalty"] = iqae_range_penalty
-
-        # Regularize to encourage encoder to output in range
-        delta_enc_outputs = enc_outputs[:, 1:] - enc_outputs[:, :-1]
-        delta_pitches = tf.cast(input_pitches[:, 1:] - input_pitches[:, :-1],
-                                tf.float32)
-        iqae_contour_penalty = tf.reduce_mean(
-            tf.square(
-                tf.maximum(1.0 - tf.multiply(delta_enc_outputs,
-                                             delta_pitches),
-                           0)
-            )
-        )
-        output_dict["iqae_contour_penalty"] = iqae_contour_penalty
-
         dec_outputs = self._lstm_decoder(quantized_enc_outputs)
 
-        # Roconstruction loss
-        dec_recons_loss = tf.reduce_mean(
-            tf.nn.sparse_softmax_cross_entropy_with_logits(
-                logits=dec_outputs,
-                labels=input_pitches)
-        )
+        range_loss = self._range_loss(enc_outputs)
+        contour_loss = self._contour_loss(enc_outputs, input_pitches)
+        reconstruction_loss = self._reconstruction_loss(dec_outputs,
+                                                        input_pitches)
         output_dict["dec_outputs"] = dec_outputs
-        output_dict["dec_recons_loss"] = dec_recons_loss
+        output_dict["range_loss"] = range_loss
+        output_dict["contour_loss"] = contour_loss
+        output_dict["reconstruction_loss"] = reconstruction_loss
 
         return output_dict
