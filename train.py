@@ -16,8 +16,8 @@ def train():
 
     model = PianoGenirModel(config=config,
                             is_training=True)
-    input_pls = model.placeholders()
-    outputs = model.build(input_pls)
+    input_dict = model.placeholders()
+    outputs = model.build(input_dict)
 
     with tf.Session() as sess:
         init_op = tf.global_variables_initializer()
@@ -29,9 +29,8 @@ def train():
                 try:
                     batch_datas = sess.run(dataset.get_batch())
                     out = sess.run(outputs,
-                                   feed_dict={input_pl: batch_data
-                                              for input_pl, batch_data
-                                              in zip(input_pls, batch_datas)})
+                                   feed_dict={input_dict[key]: batch_datas[key]
+                                              for key in input_dict.keys()})
                     print(np.array(out).shape)
                     # print(out)
                 except tf.errors.OutOfRangeError:

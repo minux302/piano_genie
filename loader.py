@@ -80,10 +80,10 @@ class NoteSeqLoader():
         note_start_times = note_sequence_tensors[:, :, 2]
         note_end_times = note_sequence_tensors[:, :, 3]
 
-        return (note_pitches,
-                note_delta_times,
-                note_start_times,
-                note_end_times)
+        return {"pitches": note_pitches,
+                "delta_times": note_delta_times,
+                "start_times": note_start_times,
+                "end_times": note_end_times}
 
 
 if __name__ == '__main__':
