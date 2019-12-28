@@ -1,54 +1,50 @@
-import sys
-
 import numpy as np
 import tensorflow.compat.v1 as tf
 from magenta.music.protobuf import music_pb2
 
+from config import Config
 
-class NoteSeqLoader():
+
+class SeqLoader():
     def __init__(self,
-                 file_name,
-                 batch_size,
-                 seq_len,
+                 config,
                  repeat):
-        self.batch_size = batch_size
-        self.seq_len = seq_len
+        self.batch_size = config.batch_size
+        self.seq_len = config.seq_len
+        self.max_discrete_times = config.max_discrete_times
         self.repeat = repeat
-        self._build_pipeline(file_name)
+        self._build_pipeline(config.file_name)
 
-    def _str_to_tensor(self, note_sequence_str):
-        note_sequence = music_pb2.NoteSequence.FromString(note_sequence_str)
-        note_sequence_ordered = list(note_sequence.notes)
-        note_sequence_ordered = sorted(note_sequence_ordered,
-                                       key=lambda n: (n.start_time, n.pitch))
-        note_sequence_ordered = [n for n in note_sequence_ordered
-                                 if (n.pitch >= 21) and (n.pitch <= 108)]
+    def _str_to_tensor(self, note_seq_str):
+        note_seq = music_pb2.NoteSequence.FromString(note_seq_str)
+        note_seq_ordered = sorted(list(note_seq.notes),
+                                  key=lambda n: (n.start_time, n.pitch))
+        note_seq_ordered = [n for n in note_seq_ordered
+                            if (n.pitch >= 21) and (n.pitch <= 108)]
 
-        pitches = np.array([note.pitch for note in note_sequence_ordered])
-        start_times = np.array([note.start_time for note in note_sequence_ordered])
-        end_times = np.array([note.end_time for note in note_sequence_ordered])
+        pitches = np.array([note.pitch for note in note_seq_ordered])
+        start_times = np.array([note.start_time for note in note_seq_ordered])
         # Delta time is a time between note on and next note on.
-        if note_sequence_ordered:
+        if note_seq_ordered:
             # Delta time start hight to indicate free decision
             delta_times = np.concatenate([[100000.],
                                          start_times[1:] - start_times[:-1]])
         else:
             delta_times = np.zeros_like(start_times)
 
-        return np.stack([pitches, delta_times, start_times, end_times],
-                        axis=1).astype(np.float32)
+        return np.stack([pitches, delta_times], axis=1).astype(np.float32)
 
-    def _filter_short(self, note_sequence_tensor):
-        note_sequence_len = tf.shape(note_sequence_tensor)[0]  # shape: (song_len, 4)
-        return tf.greater_equal(note_sequence_len, self.seq_len)
+    def _filter_short(self, seq_tensor):
+        seq_len = tf.shape(seq_tensor)[0]  # shape: (song_len, 2)
+        return tf.greater_equal(seq_len, self.seq_len)
 
-    def _random_crop(self, note_sequence_tensor):
-        note_sequence_len = tf.shape(note_sequence_tensor)[0]  # shape: (song_len, 4)
-        start_max = note_sequence_len - self.seq_len
+    def _random_crop(self, seq_tensor):
+        seq_len = tf.shape(seq_tensor)[0]  # shape: (song_len, 2)
+        start_max = seq_len - self.seq_len
         start_max = tf.maximum(start_max, 0)
         start = tf.random_uniform([], maxval=start_max + 1, dtype=tf.int32)
-        seq = note_sequence_tensor[start:start + self.seq_len]
-        return seq
+        cropped_seq_tensor = seq_tensor[start:start + self.seq_len]
+        return cropped_seq_tensor
 
     def _build_pipeline(self, file_name):
         dataset = tf.data.TFRecordDataset(file_name)
@@ -67,42 +63,41 @@ class NoteSeqLoader():
         if self.repeat:
             dataset = dataset.shuffle(buffer_size=512)
         dataset = dataset.batch(self.batch_size, drop_remainder=True)
-        self.iterator = dataset.make_initializable_iterator()
+        self.iterator = dataset.make_one_shot_iterator()
 
-    def initializer(self):
-        return self.iterator.initializer
+    def _delta_times_to_int(self, delta_times):
+        # Onsets and frames model samples at 31.25Hz
+        delta_times_int = tf.cast(
+            tf.round(delta_times * 31.25) + 1e-4, tf.int32)
+
+        # Reduce time discretizations to a fixed number of buckets
+        if self.max_discrete_times is not None:
+            delta_times_int = tf.minimum(delta_times_int,
+                                         self.max_discrete_times)
+        return delta_times_int
 
     def get_batch(self):
-        note_sequence_tensors = self.iterator.get_next()
-        note_sequence_tensors.set_shape([self.batch_size, self.seq_len, 4])
-        note_pitches = tf.cast(note_sequence_tensors[:, :, 0] + 1e-4, tf.int32)
-        note_delta_times = note_sequence_tensors[:, :, 1]
-        note_start_times = note_sequence_tensors[:, :, 2]
-        note_end_times = note_sequence_tensors[:, :, 3]
-
-        return {"pitches": note_pitches,
-                "delta_times": note_delta_times,
-                "start_times": note_start_times,
-                "end_times": note_end_times}
+        seq_tensors = self.iterator.get_next()
+        seq_tensors.set_shape([self.batch_size, self.seq_len, 2])
+        pitches = tf.cast(seq_tensors[:, :, 0] + 1e-4, tf.int32)
+        delta_times = seq_tensors[:, :, 1]
+        delta_times_int = self._delta_times_to_int(delta_times)
+        return {"pitches": pitches,
+                "delta_times_int": delta_times_int}
 
 
 if __name__ == '__main__':
-    dataset = NoteSeqLoader(file_name='midi_sample_tf',
-                            batch_size=1,
-                            seq_len=5,
-                            repeat=False)
+    config = Config()
+    dataset = SeqLoader(config=config,
+                        repeat=False)
 
     with tf.Session() as sess:
         for epoch in range(1):
-            sess.run(dataset.initializer())
             while True:
                 try:
                     batch_data = sess.run(dataset.get_batch())
-                    # print(batch_data[0].shape)
-                    # print(batch_data[1].shape)
-                    # print(batch_data[2].shape)
-                    # print(batch_data[3].shape)
-                    print(batch_data[0])
+                    print(batch_data["pitches"])
+                    print(batch_data["delta_times_int"])
                 except tf.errors.OutOfRangeError:
                     break
 
