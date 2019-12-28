@@ -77,6 +77,16 @@ class PianoGenirModel():
                                                                return_sequences=True))(x)
         return x
 
+    @classmethod
+    def _iqst(cls, x, n):
+        """Integer quantization with straight-through estimator."""
+        eps = 1e-7
+        s = float(n - 1)
+        xp = tf.clip_by_value((x + 1) / 2.0, -eps, 1 + eps)
+        xpp = tf.round(s * xp)
+        xppp = 2 * (xpp / s) - 1
+        return xpp, x + tf.stop_gradient(xppp - x)
+
     def build(self, inputs):
         out_dict = {}
         note_pitches = inputs[0]
@@ -100,23 +110,16 @@ class PianoGenirModel():
             with tf.variable_scope("pre_iq"):
                 pre_iq_encoding = tf.layers.dense(enc_stp, 1)[:, :, 0]  # (batch_size, seq_len)
 
-            def iqst(x, n):
-                eps = 1e-7
-                s = float(n - 1)
-                xp = tf.clip_by_value((x + 1) / 2.0, -eps, 1 + eps)
-                xpp = tf.round(s * xp)
-                xppp = 2 * (xpp / s) - 1
-                return xpp, x + tf.stop_gradient(xppp - x)
-
             with tf.variable_scope("quantizer"):
                 # Pass rounded vals to decoder w/ straight-through estimator
-                stp_emb_iq_discrete_f, stp_emb_iq_discrete_rescaled = iqst(
-                    pre_iq_encoding, cfg.stp_emb_iq_nbins)
-                stp_emb_iq_discrete = tf.cast(stq_emb_iq_discrete_f + 1e-4, tf.int32)
+                stp_emb_iq_discrete_f, stp_emb_iq_discrete_rescaled = self._iqst(
+                    pre_iq_encoding, self.config.stp_emb_iq_nbins)
+                stp_emb_iq_discrete = tf.cast(stp_emb_iq_discrete_f + 1e-4, tf.int32)
                 stp_emb_iq_discrete_f = tf.cast(stp_emb_iq_discrete, tf.float32)
                 stp_emb_iq_quantized = tf.expand_dims(
-                    stp_emb_iq_discrete_rescaled, axis=2)
+                    stp_emb_iq_discrete_rescaled, axis=2)  # (batch_size, seq_len, 1)
 
+        """
                 # Determine which elements round to valid indices
                 stp_emb_iq_inrange = tf.logical_and(
                     tf.greater_equal(pre_iq_encoding, -1),

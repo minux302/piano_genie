@@ -7,3 +7,5 @@ class Config():
 
         self.rnn_nlayers = 2
         self.rnn_nunits = 128
+
+        self.stp_emb_iq_nbins = 8
