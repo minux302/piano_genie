@@ -33,7 +33,7 @@ class PianoGenieModel():
             x = tf.keras.layers.Bidirectional(
                     tf.keras.layers.LSTM(self.rnn_nunits,
                                          return_sequences=True))(x)  # (batch_size, seq_len, self.rnn_nunits * 2)
-            x = tf.layers.dense(x, 1)[:, :, 0]
+            x = tf.layers.dense(x, 1)
         return x
 
     def _lstm_decoder(self, x):
@@ -53,14 +53,14 @@ class PianoGenieModel():
             hard_sigmoid_x = tf.clip_by_value((x + 1) / 2.0, -eps, 1 + eps)
             _quantized_x = tf.round(scale * hard_sigmoid_x)
             quantized_x = 2 * (_quantized_x / scale) - 1
-            forward_quantized_x = x + tf.stop_gradient(quantized_x - x)
-        return tf.expand_dims(forward_quantized_x, axis=2)
+        return x + tf.stop_gradient(quantized_x - x)
 
     def _range_loss(self, enc_outputs):
         return tf.reduce_mean(
             tf.square(tf.maximum(tf.abs(enc_outputs) - 1, 0)))
 
     def _contour_loss(self, enc_outputs, input_pitches):
+        enc_outputs = tf.squeeze(enc_outputs, axis=2)  # (batch_size, seq_len)
         delta_enc_outputs = enc_outputs[:, 1:] - enc_outputs[:, :-1]
         delta_pitches = tf.cast(input_pitches[:, 1:] - input_pitches[:, :-1],
                                 tf.float32)
@@ -82,8 +82,7 @@ class PianoGenieModel():
             [tf.one_hot(input_pitches, 88),
              tf.one_hot(input_delta_times_int,
                         self.config.max_discrete_times + 1)],
-            axis=2)
-        enc_inputs = tf.Print(enc_inputs, [tf.shape(enc_inputs)])  # (batch_size, seq_len, 88 + max_discrete_times + 1)
+            axis=2)  # (batch_size, seq_len, 88 + max_discrete_times + 1)
 
         enc_outputs = self._lstm_encoder(enc_inputs)  # (batch_size, seq_len, 1)
         quantized_enc_outputs = self._iqae(enc_outputs)  # (batch_size, seq_len, 1)
@@ -98,3 +97,9 @@ class PianoGenieModel():
                 "range_loss": range_loss,
                 "contour_loss": contour_loss,
                 "reconstructions_loss": reconstruction_loss}
+
+    def loss(self, output_dict):
+        combined_loss = output_dict["reconstruction_loss"] + \
+            self.config.range_loss_ratio * output_dict["range_loss"] + \
+            self.config.coutour_loss_ratio * output_dict["contour_loss"]
+        return combined_loss
