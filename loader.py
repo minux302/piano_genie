@@ -71,9 +71,8 @@ class SeqLoader():
             tf.round(delta_times * 31.25) + 1e-4, tf.int32)
 
         # Reduce time discretizations to a fixed number of buckets
-        if self.max_discrete_times is not None:
-            delta_times_int = tf.minimum(delta_times_int,
-                                         self.max_discrete_times)
+        delta_times_int = tf.minimum(delta_times_int,
+                                     self.max_discrete_times)
         return delta_times_int
 
     def get_batch(self):
@@ -98,6 +97,8 @@ if __name__ == '__main__':
                     batch_data = sess.run(dataset.get_batch())
                     print(batch_data["pitches"])
                     print(batch_data["delta_times_int"])
+                    print(type(batch_data["pitches"][0][0]))
+                    print(type(batch_data["delta_times_int"][0][0]))
                 except tf.errors.OutOfRangeError:
                     break
 

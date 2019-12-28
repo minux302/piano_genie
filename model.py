@@ -18,7 +18,7 @@ class PianoGenieModel():
             pitches = tf.placeholder(tf.int32,
                                      [None, self.seq_len],
                                      name="pitches")
-            delta_times_int = tf.placeholder(tf.float32,
+            delta_times_int = tf.placeholder(tf.int32,
                                              [None, self.seq_len],
                                              name="delta_times_int")
         return {"pitches": pitches,
@@ -75,22 +75,26 @@ class PianoGenieModel():
                 labels=input_pitches))
 
     def build(self, input_dict):
-        output_dict = {}
-        input_pitches = input_dict["pitches"]
-        # input_delta_times_int = input_dict["delta_times_int"]
+        input_pitches = input_dict["pitches"]  # (batch_size, seq_len)
+        input_delta_times_int = input_dict["delta_times_int"]
 
-        enc_inputs = tf.one_hot(input_pitches, 88, axis=-1)  # (batch_size, seq_len, 88)
+        enc_inputs = tf.concat(
+            [tf.one_hot(input_pitches, 88),
+             tf.one_hot(input_delta_times_int,
+                        self.config.max_discrete_times + 1)],
+            axis=2)
+        enc_inputs = tf.Print(enc_inputs, [tf.shape(enc_inputs)])  # (batch_size, seq_len, 88 + max_discrete_times + 1)
+
         enc_outputs = self._lstm_encoder(enc_inputs)  # (batch_size, seq_len, 1)
         quantized_enc_outputs = self._iqae(enc_outputs)  # (batch_size, seq_len, 1)
-        dec_outputs = self._lstm_decoder(quantized_enc_outputs)
+        dec_outputs = self._lstm_decoder(quantized_enc_outputs)  # (batch_size, seq_len, 88)
 
         range_loss = self._range_loss(enc_outputs)
         contour_loss = self._contour_loss(enc_outputs, input_pitches)
         reconstruction_loss = self._reconstruction_loss(dec_outputs,
                                                         input_pitches)
-        output_dict["dec_outputs"] = dec_outputs
-        output_dict["range_loss"] = range_loss
-        output_dict["contour_loss"] = contour_loss
-        output_dict["reconstruction_loss"] = reconstruction_loss
 
-        return output_dict
+        return {"dec_outputs": dec_outputs,
+                "range_loss": range_loss,
+                "contour_loss": contour_loss,
+                "reconstructions_loss": reconstruction_loss}
