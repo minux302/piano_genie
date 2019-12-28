@@ -22,7 +22,7 @@ class SeqLoader():
         note_seq_ordered = [n for n in note_seq_ordered
                             if (n.pitch >= 21) and (n.pitch <= 108)]
 
-        pitches = np.array([note.pitch for note in note_seq_ordered])
+        pitches = np.array([note.pitch - 21 for note in note_seq_ordered])  # [21, 108) -> [0, 88)
         start_times = np.array([note.start_time for note in note_seq_ordered])
         # Delta time is a time between note on and next note on.
         if note_seq_ordered:
