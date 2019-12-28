@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 
 from loader import NoteSeqLoader
-from model import PianoGenirModel
+from model import PianoGenieModel
 from config import Config
 
 
@@ -14,7 +14,7 @@ def train():
                             seq_len=config.seq_len,
                             repeat=False)
 
-    model = PianoGenirModel(config=config,
+    model = PianoGenieModel(config=config,
                             is_training=True)
     input_dict = model.placeholders()
     outputs = model.build(input_dict)
