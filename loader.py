@@ -16,6 +16,15 @@ class SeqLoader():
         self._build_pipeline(config.file_name)
 
     def _str_to_tensor(self, note_seq_str):
+        """parse NoteSequence and extract pitch and length of notes.
+           NoteSequence: https://github.com/tensorflow/magenta/blob/master/magenta/scripts/README.md
+            Args:
+                note_seq_str(NoteSequence)
+            Return:
+                np.array(np.float32): (note_num, 2(pitches, delta_times))
+                    pitches: [0, 88) int value
+                    delta_times: note on time(seq, maybe...)
+        """
         note_seq = music_pb2.NoteSequence.FromString(note_seq_str)
         note_seq_ordered = sorted(list(note_seq.notes),
                                   key=lambda n: (n.start_time, n.pitch))
@@ -32,6 +41,7 @@ class SeqLoader():
         else:
             delta_times = np.zeros_like(start_times)
 
+        print(delta_times)
         return np.stack([pitches, delta_times], axis=1).astype(np.float32)
 
     def _filter_short(self, seq_tensor):
@@ -95,10 +105,10 @@ if __name__ == '__main__':
             while True:
                 try:
                     batch_data = sess.run(dataset.get_batch())
-                    print(batch_data["pitches"])
-                    print(batch_data["delta_times_int"])
-                    print(type(batch_data["pitches"][0][0]))
-                    print(type(batch_data["delta_times_int"][0][0]))
+                    # print(batch_data["pitches"])
+                    # print(batch_data["delta_times_int"])
+                    # print(type(batch_data["pitches"][0][0]))
+                    # print(type(batch_data["delta_times_int"][0][0]))
                 except tf.errors.OutOfRangeError:
                     break
 
