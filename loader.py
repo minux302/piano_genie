@@ -24,7 +24,7 @@ class SeqLoader():
             Return:
                 np.array(np.float32): (song_len, 2(pitches, delta_times))
                     pitches: [0, 88) int value
-                    delta_times: note on time(seq, maybe...)
+                    delta_times: note on time(sampled by 31.25Hz)
         """
         note_seq = music_pb2.NoteSequence.FromString(note_seq_str)
         note_seq_ordered = sorted(list(note_seq.notes),
@@ -45,7 +45,7 @@ class SeqLoader():
         return np.stack([pitches, delta_times], axis=1).astype(np.float32)
 
     def _filter_short(self, seq_tensor):
-        """
+        """Return Bool whether or not seq_tensor is longer than self.seq_len.
             Args:
                 seq_tensor (tf.tensor): shape (song_len, 2)
             Return:
@@ -89,6 +89,7 @@ class SeqLoader():
         self.iterator = dataset.make_one_shot_iterator()
 
     def _delta_times_to_int(self, delta_times):
+        """convert hz to sec of delta_times unit"""
         # Onsets and frames model samples at 31.25Hz
         delta_times_int = tf.cast(
             tf.round(delta_times * 31.25) + 1e-4, tf.int32)
