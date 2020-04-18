@@ -1,3 +1,4 @@
+import sys
 import numpy as np
 import tensorflow.compat.v1 as tf
 from magenta.music.protobuf import music_pb2
@@ -16,12 +17,12 @@ class SeqLoader():
         self._build_pipeline(config.file_name)
 
     def _str_to_tensor(self, note_seq_str):
-        """parse NoteSequence and extract pitch and length of notes.
+        """parse NoteSequence and extract pitches and note length (in songs).
            NoteSequence: https://github.com/tensorflow/magenta/blob/master/magenta/scripts/README.md
             Args:
                 note_seq_str(NoteSequence)
             Return:
-                np.array(np.float32): (note_num, 2(pitches, delta_times))
+                np.array(np.float32): (song_len, 2(pitches, delta_times))
                     pitches: [0, 88) int value
                     delta_times: note on time(seq, maybe...)
         """
@@ -41,30 +42,42 @@ class SeqLoader():
         else:
             delta_times = np.zeros_like(start_times)
 
-        print(delta_times)
         return np.stack([pitches, delta_times], axis=1).astype(np.float32)
 
     def _filter_short(self, seq_tensor):
-        seq_len = tf.shape(seq_tensor)[0]  # shape: (song_len, 2)
+        """
+            Args:
+                seq_tensor (tf.tensor): shape (song_len, 2)
+            Return:
+                bool(seq_tensor length >= self.seq_len)
+        """
+        seq_len = tf.shape(seq_tensor)[0]
         return tf.greater_equal(seq_len, self.seq_len)
 
     def _random_crop(self, seq_tensor):
-        seq_len = tf.shape(seq_tensor)[0]  # shape: (song_len, 2)
+        """Random Crop tensor(len=seq_len) from seq_tensor
+            Args:
+                seq_tensor (tf.tensor): shape (song_len, 2)
+            Return:
+                tf.tensor: shape (seq_len, 2)
+        """
+        seq_len = tf.shape(seq_tensor)[0]
         start_max = seq_len - self.seq_len
         start_max = tf.maximum(start_max, 0)
         start = tf.random_uniform([], maxval=start_max + 1, dtype=tf.int32)
         cropped_seq_tensor = seq_tensor[start:start + self.seq_len]
+        # tf.print("tensors:", cropped_seq_tensor, output_stream=sys.stdout)
         return cropped_seq_tensor
 
     def _build_pipeline(self, file_name):
         dataset = tf.data.TFRecordDataset(file_name)
+        # Parse NoteSequence to (song_len, (pitches, delta_times))
         dataset = dataset.map(
             lambda data: tf.py_func(
                 self._str_to_tensor,
                 [data],
                 [tf.float32],
                 stateful=False))
-
         # Filter sequences that are too short
         dataset = dataset.filter(self._filter_short)
         # Get random seq_len crops from songs
